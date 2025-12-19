@@ -1,4 +1,4 @@
-package com.example.myojcodesandbox;
+package com.qwerlty.myojcodesandbox;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
