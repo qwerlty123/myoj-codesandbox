@@ -1,10 +1,8 @@
-package com.qwerlty.myojcodesandbox.security;
-
 import java.io.File;
 import java.security.Permission;
 
 /**
- * 子进程用安全管理器。
+ * 子进程用安全管理器（默认包，供 -cp resources/security 加载）。
  * 通过 -Dallowed.read.path=目录 指定允许读的根目录，禁止执行、写、删、网络。
  */
 public class MySecurityManager extends SecurityManager {

@@ -1,0 +1,16 @@
+# 每行一个违禁词，# 开头为注释，留空则使用代码内默认黑名单
+# Runtime.getRuntime
+# ProcessBuilder
+# exec(
+# System.exit
+# java.io.File
+# Files.
+# reflect.
+# Class.forName
+# URLClassLoader
+# ScriptEngineManager
+# javax.script
+# sun.misc
+# java.net
+# setSecurityManager
+# ToolProvider.getSystemJavaCompiler
