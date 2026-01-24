@@ -1,4 +1,4 @@
-package com.example.myojcodesandbox;
+package com.qwerlty.myojcodesandbox;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
