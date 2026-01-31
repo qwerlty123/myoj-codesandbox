@@ -8,93 +8,70 @@ import org.springframework.util.StopWatch;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /**
- * 进程工具类：执行进程并支持超时、获取输出与耗时
+ * 进程工具类
  */
 public class ProcessUtils {
 
-    /** 超时时的错误信息前缀 */
-    public static final String TIMEOUT_ERROR_MSG = "运行超时，已强制终止";
-
     /**
-     * 执行进程并获取信息（无超时，一直等待）
+     * 执行进程并获取信息
+     *
+     * @param runProcess
+     * @param opName
+     * @return
      */
     public static ExecuteMessage runProcessAndGetMessage(Process runProcess, String opName) {
-        return runProcessAndGetMessage(runProcess, opName, null);
-    }
-
-    /**
-     * 执行进程并获取信息，支持超时
-     *
-     * @param runProcess 进程
-     * @param opName     操作名称（如 "编译"、"运行"）
-     * @param timeoutMs  超时毫秒数，null 表示不限制
-     * @return 执行结果；若超时则 errorMessage 为 TIMEOUT_ERROR_MSG，并会 destroy 进程
-     */
-    public static ExecuteMessage runProcessAndGetMessage(Process runProcess, String opName, Long timeoutMs) {
         ExecuteMessage executeMessage = new ExecuteMessage();
 
         try {
             StopWatch stopWatch = new StopWatch();
             stopWatch.start();
-
-            boolean finishedInTime;
-            if (timeoutMs != null && timeoutMs > 0) {
-                finishedInTime = runProcess.waitFor(timeoutMs, TimeUnit.MILLISECONDS);
-                if (!finishedInTime) {
-                    runProcess.destroyForcibly();
-                    runProcess.waitFor(2, TimeUnit.SECONDS);
-                    executeMessage.setExitValue(-1);
-                    executeMessage.setErrorMessage(TIMEOUT_ERROR_MSG);
-                    stopWatch.stop();
-                    executeMessage.setTime(stopWatch.getLastTaskTimeMillis());
-                    return executeMessage;
-                }
-            } else {
-                runProcess.waitFor();
-            }
-
-            int exitValue = runProcess.exitValue();
+            // 等待程序执行，获取错误码
+            int exitValue = runProcess.waitFor();
             executeMessage.setExitValue(exitValue);
-
+            // 正常退出
             if (exitValue == 0) {
-                String out = readStream(runProcess.getInputStream());
-                executeMessage.setMessage(out != null ? out : "");
+                System.out.println(opName + "成功");
+                // 分批获取进程的正常输出
+                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(runProcess.getInputStream()));
+                List<String> outputStrList = new ArrayList<>();
+                // 逐行读取
+                String compileOutputLine;
+                while ((compileOutputLine = bufferedReader.readLine()) != null) {
+                    outputStrList.add(compileOutputLine);
+                }
+                executeMessage.setMessage(StringUtils.join(outputStrList, "\n"));
             } else {
-                String out = readStream(runProcess.getInputStream());
-                executeMessage.setMessage(out != null ? out : "");
-                String err = readStream(runProcess.getErrorStream());
-                executeMessage.setErrorMessage(err != null ? err : "");
-            }
+                // 异常退出
+                System.out.println(opName + "失败，错误码： " + exitValue);
+                // 分批获取进程的正常输出
+                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(runProcess.getInputStream()));
+                List<String> outputStrList = new ArrayList<>();
+                // 逐行读取
+                String compileOutputLine;
+                while ((compileOutputLine = bufferedReader.readLine()) != null) {
+                    outputStrList.add(compileOutputLine);
+                }
+                executeMessage.setMessage(StringUtils.join(outputStrList, "\n"));
 
+                // 分批获取进程的错误输出
+                BufferedReader errorBufferedReader = new BufferedReader(new InputStreamReader(runProcess.getErrorStream()));
+                // 逐行读取
+                List<String> errorOutputStrList = new ArrayList<>();
+                // 逐行读取
+                String errorCompileOutputLine;
+                while ((errorCompileOutputLine = errorBufferedReader.readLine()) != null) {
+                    errorOutputStrList.add(errorCompileOutputLine);
+                }
+                executeMessage.setErrorMessage(StringUtils.join(errorOutputStrList, "\n"));
+            }
             stopWatch.stop();
             executeMessage.setTime(stopWatch.getLastTaskTimeMillis());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            runProcess.destroyForcibly();
-            executeMessage.setExitValue(-1);
-            executeMessage.setErrorMessage("执行被中断: " + e.getMessage());
         } catch (Exception e) {
-            executeMessage.setExitValue(-1);
-            executeMessage.setErrorMessage(opName + "异常: " + e.getMessage());
+            e.printStackTrace();
         }
         return executeMessage;
-    }
-
-    private static String readStream(InputStream is) {
-        if (is == null) return "";
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
-            List<String> lines = new ArrayList<>();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                lines.add(line);
-            }
-            return StringUtils.join(lines, "\n");
-        } catch (Exception e) {
-            return "";
-        }
     }
 
     /**
@@ -112,7 +89,7 @@ public class ProcessUtils {
             OutputStream outputStream = runProcess.getOutputStream();
             OutputStreamWriter outputStreamWriter = new OutputStreamWriter(outputStream);
             String[] s = args.split(" ");
-            String join = StrUtil.join("\n", (Object[]) s) + "\n";
+            String join = StrUtil.join("\n", s) + "\n";
             outputStreamWriter.write(join);
             // 相当于按了回车，执行输入的发送
             outputStreamWriter.flush();
