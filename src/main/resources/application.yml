@@ -1,4 +1,10 @@
 server:
   port: 8090
 
-
+# 与后端通信的 API 签名认证（需与后端 codesandbox.secretKey 一致）
+codesandbox:
+  auth:
+    # 共享密钥，请与后端配置一致并妥善保管
+    secretKey: your-codesandbox-secret-key-change-in-production
+    # 时间戳有效时间（秒），超出视为重放攻击拒绝，默认 300 秒
+    timestampToleranceSeconds: 300
