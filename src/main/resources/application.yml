@@ -1,10 +1,29 @@
 server:
   port: 8090
 
+spring:
+  application:
+    name: myoj-codesandbox
+
 # 与后端通信的 API 签名认证（需与后端 codesandbox.secretKey 一致）
 codesandbox:
   auth:
     # 共享密钥，请与后端配置一致并妥善保管
-    secretKey: your-codesandbox-secret-key-change-in-production
+    secretKey: adgjl08642
     # 时间戳有效时间（秒），超出视为重放攻击拒绝，默认 300 秒
     timestampToleranceSeconds: 300
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
