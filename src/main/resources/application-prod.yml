@@ -1,0 +1,4 @@
+codesandbox:
+  auth:
+    secretKey: ${CODESANDBOX_SECRET_KEY:adgjl08642}
+    timestampToleranceSeconds: ${CODESANDBOX_TIMESTAMP_TOLERANCE_SECONDS:300}
