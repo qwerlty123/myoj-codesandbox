@@ -17,4 +17,10 @@ public class ExecuteMessage {
     private Long time;
 
     private Long memory;
+
+    /** 是否因为超过执行时间限制而被终止 */
+    private Boolean timedOut;
+
+    /** 标准输出或错误输出是否超过采集上限 */
+    private Boolean outputLimitExceeded;
 }

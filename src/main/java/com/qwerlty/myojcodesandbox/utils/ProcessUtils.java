@@ -1,18 +1,30 @@
 package com.qwerlty.myojcodesandbox.utils;
 
-import cn.hutool.core.util.StrUtil;
 import com.qwerlty.myojcodesandbox.model.ExecuteMessage;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.util.StopWatch;
 
-import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 进程工具类
  */
 public class ProcessUtils {
+
+    private static final long DEFAULT_TIMEOUT_MILLIS = 60_000L;
+
+    private static final int DEFAULT_OUTPUT_LIMIT_BYTES = 64 * 1024;
+
+    private ProcessUtils() {
+    }
 
     /**
      * 执行进程并获取信息
@@ -22,56 +34,61 @@ public class ProcessUtils {
      * @return
      */
     public static ExecuteMessage runProcessAndGetMessage(Process runProcess, String opName) {
-        ExecuteMessage executeMessage = new ExecuteMessage();
+        return runProcessAndGetMessage(
+                runProcess,
+                null,
+                opName,
+                DEFAULT_TIMEOUT_MILLIS,
+                DEFAULT_OUTPUT_LIMIT_BYTES
+        );
+    }
+
+    /**
+     * 同时消费 stdout / stderr，向 stdin 写入测试数据，并在超时后终止进程。
+     * 先 waitFor 再读取输出会在管道缓冲区写满时死锁，因此三个流必须并行处理。
+     */
+    public static ExecuteMessage runProcessAndGetMessage(Process process,
+                                                         String input,
+                                                         String opName,
+                                                         long timeoutMillis,
+                                                         int outputLimitBytes) {
+        ExecuteMessage result = new ExecuteMessage();
+        long startedAt = System.nanoTime();
+        ExecutorService executor = Executors.newFixedThreadPool(3, daemonThreadFactory(opName));
+        Future<CapturedOutput> stdoutFuture = executor.submit(new StreamCollector(process.getInputStream(), outputLimitBytes));
+        Future<CapturedOutput> stderrFuture = executor.submit(new StreamCollector(process.getErrorStream(), outputLimitBytes));
+        Future<?> stdinFuture = executor.submit(() -> writeInput(process, input));
 
         try {
-            StopWatch stopWatch = new StopWatch();
-            stopWatch.start();
-            // 等待程序执行，获取错误码
-            int exitValue = runProcess.waitFor();
-            executeMessage.setExitValue(exitValue);
-            // 正常退出
-            if (exitValue == 0) {
-                System.out.println(opName + "成功");
-                // 分批获取进程的正常输出
-                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(runProcess.getInputStream()));
-                List<String> outputStrList = new ArrayList<>();
-                // 逐行读取
-                String compileOutputLine;
-                while ((compileOutputLine = bufferedReader.readLine()) != null) {
-                    outputStrList.add(compileOutputLine);
-                }
-                executeMessage.setMessage(StringUtils.join(outputStrList, "\n"));
+            boolean finished = process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS);
+            if (!finished) {
+                result.setTimedOut(true);
+                terminate(process);
             } else {
-                // 异常退出
-                System.out.println(opName + "失败，错误码： " + exitValue);
-                // 分批获取进程的正常输出
-                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(runProcess.getInputStream()));
-                List<String> outputStrList = new ArrayList<>();
-                // 逐行读取
-                String compileOutputLine;
-                while ((compileOutputLine = bufferedReader.readLine()) != null) {
-                    outputStrList.add(compileOutputLine);
-                }
-                executeMessage.setMessage(StringUtils.join(outputStrList, "\n"));
-
-                // 分批获取进程的错误输出
-                BufferedReader errorBufferedReader = new BufferedReader(new InputStreamReader(runProcess.getErrorStream()));
-                // 逐行读取
-                List<String> errorOutputStrList = new ArrayList<>();
-                // 逐行读取
-                String errorCompileOutputLine;
-                while ((errorCompileOutputLine = errorBufferedReader.readLine()) != null) {
-                    errorOutputStrList.add(errorCompileOutputLine);
-                }
-                executeMessage.setErrorMessage(StringUtils.join(errorOutputStrList, "\n"));
+                result.setTimedOut(false);
             }
-            stopWatch.stop();
-            executeMessage.setTime(stopWatch.getLastTaskTimeMillis());
+            result.setExitValue(finished ? process.exitValue() : -1);
+
+            CapturedOutput stdout = stdoutFuture.get(2, TimeUnit.SECONDS);
+            CapturedOutput stderr = stderrFuture.get(2, TimeUnit.SECONDS);
+            result.setMessage(stripTrailingLineBreaks(stdout.text));
+            result.setErrorMessage(stripTrailingLineBreaks(stderr.text));
+            result.setOutputLimitExceeded(stdout.truncated || stderr.truncated);
+            stdinFuture.cancel(true);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            terminate(process);
+            result.setExitValue(-1);
+            result.setErrorMessage(opName + "被中断");
         } catch (Exception e) {
-            e.printStackTrace();
+            terminate(process);
+            result.setExitValue(-1);
+            result.setErrorMessage(opName + "进程处理失败: " + safeMessage(e));
+        } finally {
+            result.setTime(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt));
+            executor.shutdownNow();
         }
-        return executeMessage;
+        return result;
     }
 
     /**
@@ -82,36 +99,102 @@ public class ProcessUtils {
      * @return
      */
     public static ExecuteMessage runInteractProcessAndGetMessage(Process runProcess, String args) {
-        ExecuteMessage executeMessage = new ExecuteMessage();
+        return runProcessAndGetMessage(
+                runProcess,
+                args,
+                "运行",
+                DEFAULT_TIMEOUT_MILLIS,
+                DEFAULT_OUTPUT_LIMIT_BYTES
+        );
+    }
 
-        try {
-            // 向控制台输入程序
-            OutputStream outputStream = runProcess.getOutputStream();
-            OutputStreamWriter outputStreamWriter = new OutputStreamWriter(outputStream);
-            String[] s = args.split(" ");
-            String join = StrUtil.join("\n", s) + "\n";
-            outputStreamWriter.write(join);
-            // 相当于按了回车，执行输入的发送
-            outputStreamWriter.flush();
-
-            // 分批获取进程的正常输出
-            InputStream inputStream = runProcess.getInputStream();
-            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
-            StringBuilder compileOutputStringBuilder = new StringBuilder();
-            // 逐行读取
-            String compileOutputLine;
-            while ((compileOutputLine = bufferedReader.readLine()) != null) {
-                compileOutputStringBuilder.append(compileOutputLine);
+    private static void writeInput(Process process, String input) {
+        try (OutputStream outputStream = process.getOutputStream()) {
+            if (input != null) {
+                outputStream.write(input.getBytes(StandardCharsets.UTF_8));
+                if (!input.endsWith("\n")) {
+                    outputStream.write('\n');
+                }
             }
-            executeMessage.setMessage(compileOutputStringBuilder.toString());
-            // 记得资源的释放，否则会卡死
-            outputStreamWriter.close();
-            outputStream.close();
-            inputStream.close();
-            runProcess.destroy();
-        } catch (Exception e) {
-            e.printStackTrace();
+            outputStream.flush();
+        } catch (IOException ignored) {
+            // 进程提前退出或被超时终止时，关闭的 stdin 会产生 Broken pipe。
         }
-        return executeMessage;
+    }
+
+    private static void terminate(Process process) {
+        if (!process.isAlive()) {
+            return;
+        }
+        process.destroy();
+        try {
+            if (!process.waitFor(200, TimeUnit.MILLISECONDS)) {
+                process.destroyForcibly();
+                process.waitFor(200, TimeUnit.MILLISECONDS);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            process.destroyForcibly();
+        }
+    }
+
+    private static String stripTrailingLineBreaks(String value) {
+        return value == null ? null : value.replaceFirst("[\\r\\n]+$", "");
+    }
+
+    private static String safeMessage(Exception exception) {
+        Throwable cause = exception.getCause() == null ? exception : exception.getCause();
+        return cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
+    }
+
+    private static ThreadFactory daemonThreadFactory(String opName) {
+        return runnable -> {
+            Thread thread = new Thread(runnable, "sandbox-" + opName + "-io");
+            thread.setDaemon(true);
+            return thread;
+        };
+    }
+
+    private static final class StreamCollector implements Callable<CapturedOutput> {
+
+        private final InputStream inputStream;
+        private final int limit;
+
+        private StreamCollector(InputStream inputStream, int limit) {
+            this.inputStream = inputStream;
+            this.limit = Math.max(0, limit);
+        }
+
+        @Override
+        public CapturedOutput call() throws IOException {
+            ByteArrayOutputStream captured = new ByteArrayOutputStream(Math.min(limit, 4096));
+            byte[] buffer = new byte[4096];
+            long total = 0L;
+            int read;
+            try (InputStream stream = inputStream) {
+                while ((read = stream.read(buffer)) != -1) {
+                    int writable = Math.min(read, Math.max(0, limit - captured.size()));
+                    if (writable > 0) {
+                        captured.write(buffer, 0, writable);
+                    }
+                    total += read;
+                }
+            }
+            return new CapturedOutput(
+                    new String(captured.toByteArray(), StandardCharsets.UTF_8),
+                    total > limit
+            );
+        }
+    }
+
+    private static final class CapturedOutput {
+
+        private final String text;
+        private final boolean truncated;
+
+        private CapturedOutput(String text, boolean truncated) {
+            this.text = text;
+            this.truncated = truncated;
+        }
     }
 }

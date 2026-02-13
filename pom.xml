@@ -91,8 +91,7 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring-boot.version}</version>
                 <configuration>
-                    <mainClass>com.example.myojcodesandbox.MyojCodesandboxApplication</mainClass>
-                    <skip>true</skip>
+                    <mainClass>com.qwerlty.myojcodesandbox.CodesandboxApplication</mainClass>
                 </configuration>
                 <executions>
                     <execution>
