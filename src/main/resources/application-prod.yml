@@ -1,4 +1,10 @@
 codesandbox:
+  type: ${CODESANDBOX_TYPE:container}
   auth:
     secretKey: ${CODESANDBOX_SECRET_KEY}
     timestampToleranceSeconds: ${CODESANDBOX_TIMESTAMP_TOLERANCE_SECONDS:300}
+  container:
+    java-image: ${CODESANDBOX_JAVA_IMAGE}
+    cpp-image: ${CODESANDBOX_CPP_IMAGE}
+    go-image: ${CODESANDBOX_GO_IMAGE}
+    workspace-root: ${CODESANDBOX_WORKSPACE_ROOT:tmpCode/container}

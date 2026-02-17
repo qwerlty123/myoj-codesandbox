@@ -29,4 +29,9 @@ public class ExecuteCodeResponse {
     private Integer status;
 
     private JudgeInfo judgeInfo;
+
+    /**
+     * 逐用例执行结果。保留 outputList 以兼容现有 Judge Service。
+     */
+    private List<CaseExecutionResult> caseResults;
 }

@@ -7,11 +7,29 @@ spring:
 
 # 与后端通信的 API 签名认证（需与后端 codesandbox.secretKey 一致）
 codesandbox:
+  type: ${CODESANDBOX_TYPE:container}
   auth:
-    # 共享密钥，请与后端配置一致并妥善保管
-    secretKey: adgjl08642
+    # 共享密钥只从环境注入，并与所有合法调用方保持一致
+    secretKey: ${CODESANDBOX_SECRET_KEY:}
     # 时间戳有效时间（秒），超出视为重放攻击拒绝，默认 300 秒
     timestampToleranceSeconds: 300
+  container:
+    java-image: ${CODESANDBOX_JAVA_IMAGE:eclipse-temurin:17-jdk}
+    cpp-image: ${CODESANDBOX_CPP_IMAGE:gcc:13}
+    go-image: ${CODESANDBOX_GO_IMAGE:golang:1.22}
+    workspace-root: ${CODESANDBOX_WORKSPACE_ROOT:tmpCode/container}
+    user: ${CODESANDBOX_CONTAINER_USER:65534:65534}
+    compile-timeout-ms: ${CODESANDBOX_COMPILE_TIMEOUT_MS:20000}
+    default-time-limit-ms: ${CODESANDBOX_DEFAULT_TIME_LIMIT_MS:5000}
+    max-time-limit-ms: ${CODESANDBOX_MAX_TIME_LIMIT_MS:15000}
+    default-memory-limit-kb: ${CODESANDBOX_DEFAULT_MEMORY_LIMIT_KB:262144}
+    max-memory-limit-kb: ${CODESANDBOX_MAX_MEMORY_LIMIT_KB:524288}
+    default-stack-limit-kb: ${CODESANDBOX_DEFAULT_STACK_LIMIT_KB:262144}
+    max-stack-limit-kb: ${CODESANDBOX_MAX_STACK_LIMIT_KB:262144}
+    default-output-limit-bytes: ${CODESANDBOX_DEFAULT_OUTPUT_LIMIT_BYTES:65536}
+    max-output-limit-bytes: ${CODESANDBOX_MAX_OUTPUT_LIMIT_BYTES:1048576}
+    max-concurrent-executions: ${CODESANDBOX_MAX_CONCURRENT_EXECUTIONS:4}
+    queue-wait-timeout-ms: ${CODESANDBOX_QUEUE_WAIT_TIMEOUT_MS:2000}
 
 management:
   endpoints:

@@ -27,4 +27,8 @@ public class ExecuteCodeRequest {
      */
     private String language;
 
+    /**
+     * 可选执行限制。为空时由沙箱使用服务端默认值；客户端不能突破服务端硬上限。
+     */
+    private ExecutionProfile executionProfile;
 }

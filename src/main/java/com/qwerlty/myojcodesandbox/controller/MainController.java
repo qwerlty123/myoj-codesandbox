@@ -1,7 +1,7 @@
 package com.qwerlty.myojcodesandbox.controller;
 
 
-import com.qwerlty.myojcodesandbox.JavaNativeCodeSandbox;
+import com.qwerlty.myojcodesandbox.CodeSandbox;
 import com.qwerlty.myojcodesandbox.model.ExecuteCodeRequest;
 import com.qwerlty.myojcodesandbox.model.ExecuteCodeResponse;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,7 +17,7 @@ import javax.servlet.http.HttpServletResponse;
 public class MainController {
 
     @Resource
-    private JavaNativeCodeSandbox javaNativeCodeSandbox;
+    private CodeSandbox codeSandbox;
 
     @GetMapping("/health")
     public String healthCheck() {
@@ -33,6 +33,6 @@ public class MainController {
         if (executeCodeRequest == null) {
             throw new RuntimeException("请求参数为空");
         }
-        return javaNativeCodeSandbox.executeCode(executeCodeRequest);
+        return codeSandbox.executeCode(executeCodeRequest);
     }
 }
