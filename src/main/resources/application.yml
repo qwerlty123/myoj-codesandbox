@@ -28,7 +28,9 @@ codesandbox:
     max-stack-limit-kb: ${CODESANDBOX_MAX_STACK_LIMIT_KB:262144}
     default-output-limit-bytes: ${CODESANDBOX_DEFAULT_OUTPUT_LIMIT_BYTES:65536}
     max-output-limit-bytes: ${CODESANDBOX_MAX_OUTPUT_LIMIT_BYTES:1048576}
-    max-concurrent-executions: ${CODESANDBOX_MAX_CONCURRENT_EXECUTIONS:4}
+    # The current remote host exposes 2 vCPUs and each execution container may
+    # consume one CPU. Two concurrent executions avoid CPU oversubscription.
+    max-concurrent-executions: ${CODESANDBOX_MAX_CONCURRENT_EXECUTIONS:2}
     queue-wait-timeout-ms: ${CODESANDBOX_QUEUE_WAIT_TIMEOUT_MS:2000}
 
 management:

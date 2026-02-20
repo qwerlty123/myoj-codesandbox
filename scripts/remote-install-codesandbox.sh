@@ -22,6 +22,16 @@ ensure_env_value() {
   fi
 }
 
+set_env_value() {
+  local key="$1"
+  local value="$2"
+  if sudo grep -q "^${key}=" "$ENV_FILE"; then
+    sudo sed -i "s/^${key}=.*/${key}=${value}/" "$ENV_FILE"
+  else
+    printf '%s=%s\n' "$key" "$value" | sudo tee -a "$ENV_FILE" >/dev/null
+  fi
+}
+
 rollback_on_error() {
   local status=$?
   trap - ERR
@@ -61,6 +71,8 @@ ensure_env_value "CODESANDBOX_JAVA_IMAGE" "eclipse-temurin:17-jdk"
 ensure_env_value "CODESANDBOX_CPP_IMAGE" "gcc:13"
 ensure_env_value "CODESANDBOX_GO_IMAGE" "golang:1.22"
 ensure_env_value "CODESANDBOX_WORKSPACE_ROOT" "$WORKSPACE_ROOT"
+set_env_value "CODESANDBOX_MAX_CONCURRENT_EXECUTIONS" "2"
+set_env_value "CODESANDBOX_QUEUE_WAIT_TIMEOUT_MS" "2000"
 
 sudo install -d -o myoj-sandbox -g myoj-sandbox -m 0750 "$WORKSPACE_ROOT"
 

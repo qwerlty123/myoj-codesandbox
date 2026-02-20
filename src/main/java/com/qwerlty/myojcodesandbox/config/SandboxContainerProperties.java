@@ -26,6 +26,6 @@ public class SandboxContainerProperties {
     private int maxJudgeCases = 100;
     private long nanoCpus = 1_000_000_000L;
     private long pidsLimit = 64L;
-    private int maxConcurrentExecutions = 4;
+    private int maxConcurrentExecutions = 2;
     private long queueWaitTimeoutMs = 2_000L;
 }
